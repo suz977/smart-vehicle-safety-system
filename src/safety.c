@@ -1,0 +1,6 @@
+#include "safety.h"
+#include <math.h>
+#define REACTION_TIME_S 1.0
+#define BRAKING_MS2 4.5
+const char *safety_state_name(SafetyState s){switch(s){case SAFE:return "SAFE";case CAUTION:return "CAUTION";case WARNING:return "WARNING";case SENSOR_FAULT:return "SENSOR_FAULT";default:return "UNKNOWN";}}
+SafetyResult evaluate_safety(const SensorData *d){SafetyResult r={0};if(!d||!d->distance_sensor_ok||!d->motion_sensor_ok||!d->speed_sensor_ok||!isfinite(d->distance_m)||!isfinite(d->speed_kmh)||!isfinite(d->acceleration_ms2)||d->distance_m<0||d->speed_kmh<0){r.state=SENSOR_FAULT;r.buzzer_on=r.red_led_on=1;r.message="SENSOR FAULT: check inputs";return r;}double v=d->speed_kmh/3.6;r.stopping_distance_m=v*REACTION_TIME_S+v*v/(2*BRAKING_MS2);r.ttc_s=v>.01?d->distance_m/v:INFINITY;if(d->distance_m<=r.stopping_distance_m+2||(d->ir_obstacle&&d->distance_m<15)||(r.ttc_s<2&&v>.01)){r.state=WARNING;r.buzzer_on=r.red_led_on=1;r.message="COLLISION WARNING: reduce speed / stop safely";}else if(d->acceleration_ms2<=-4.5||(d->ir_obstacle&&d->distance_m>=15)){r.state=CAUTION;r.amber_led_on=1;r.message="CAUTION: obstacle or abrupt deceleration";}else{r.state=SAFE;r.green_led_on=1;r.message="SAFE: continue monitoring";}return r;}
